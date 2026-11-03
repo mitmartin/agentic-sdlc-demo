@@ -1,0 +1,34 @@
+name: Scoped change
+description: A small feature or bug fix suitable for an issue-to-PR demo
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Explain the user-visible need and any reproduction steps.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use a short, verifiable checklist.
+      value: |
+        - [ ] Expected behavior is implemented.
+        - [ ] Focused regression tests pass.
+        - [ ] Relevant documentation is updated.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Out of scope
+      description: State the boundaries explicitly.
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files likely involved
+    validations:
+      required: true
