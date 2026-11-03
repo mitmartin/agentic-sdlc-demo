@@ -30,9 +30,8 @@ function text(value: unknown, name: string, maxLength: number): string {
 }
 
 export function isOverdue(order: WorkOrder, now = new Date()): boolean {
-  // Deliberate demo bug: due-today work should not be overdue.
   return (
-    order.status !== 'done' && order.dueDate <= now.toISOString().slice(0, 10)
+    order.status !== 'done' && order.dueDate < now.toISOString().slice(0, 10)
   );
 }
 
