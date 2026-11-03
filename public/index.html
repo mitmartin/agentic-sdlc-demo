@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Contoso Fleet Ops</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to work orders</a>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Contoso Fleet Ops home">
+        <span class="brand-mark" aria-hidden="true">CF</span>
+        <span>CONTOSO <strong>Fleet Ops</strong></span>
+      </a>
+      <span class="demo-badge">Fictional data / demo only</span>
+    </header>
+    <main id="main">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">MAINTENANCE CONTROL</p>
+          <h1 id="page-title">Keep every asset moving.</h1>
+          <p class="subtitle">
+            One work list for the hangar, harbor, depot, and factory floor.
+          </p>
+        </div>
+        <button id="refresh" class="secondary" type="button">
+          Refresh data
+        </button>
+      </section>
+      <div id="notice" role="status" aria-live="polite"></div>
+      <section class="metrics" aria-label="Fleet maintenance overview">
+        <article class="metric blue">
+          <h2>Open</h2>
+          <p id="stat-open" class="metric-value">--</p>
+          <p>Ready to be picked up</p>
+        </article>
+        <article class="metric amber">
+          <h2>Overdue</h2>
+          <p id="stat-overdue" class="metric-value">--</p>
+          <p>Needs a closer look</p>
+        </article>
+        <article class="metric red">
+          <h2>Critical</h2>
+          <p id="stat-critical" class="metric-value">--</p>
+          <p>Highest-priority work</p>
+        </article>
+        <article class="metric purple">
+          <h2>Blocked</h2>
+          <p id="stat-blocked" class="metric-value">--</p>
+          <p>Waiting on the next step</p>
+        </article>
+      </section>
+      <div class="workspace">
+        <section class="panel orders" aria-labelledby="orders-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">THE WORK LIST</p>
+              <h2 id="orders-title">Maintenance work orders</h2>
+            </div>
+            <span id="order-count" class="count">Loading</span>
+          </div>
+          <div
+            class="table-scroll"
+            tabindex="0"
+            role="region"
+            aria-label="Work orders table, scroll horizontally on small screens"
+          >
+            <table>
+              <caption class="sr-only">
+                Work orders with asset, priority, status, due date, and assignee
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Work order</th>
+                  <th scope="col">Priority</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Due</th>
+                  <th scope="col">Assignee</th>
+                </tr>
+              </thead>
+              <tbody id="work-orders"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel new-order" aria-labelledby="new-title">
+          <p class="eyebrow">START SOMETHING</p>
+          <h2 id="new-title">New work order</h2>
+          <p class="form-intro">Capture the next maintenance task.</p>
+          <form id="new-order">
+            <label for="asset">Asset</label>
+            <select id="asset" name="assetId" required>
+              <option value="">Choose an asset</option>
+            </select>
+            <label for="title">What needs to be done?</label>
+            <input id="title" name="title" maxlength="140" required />
+            <div class="form-row">
+              <div>
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+              <div>
+                <label for="due">Due date (UTC)</label>
+                <input id="due" name="dueDate" type="date" required />
+              </div>
+            </div>
+            <label for="assignee">Assignee</label>
+            <input
+              id="assignee"
+              name="assignee"
+              maxlength="80"
+              placeholder="Unassigned"
+            />
+            <button type="submit">Create work order</button>
+          </form>
+        </section>
+      </div>
+      <footer>
+        <span>Contoso Fleet Ops &middot; Agentic SDLC showcase</span>
+        <span>In-memory data resets when the server restarts.</span>
+      </footer>
+    </main>
+  </body>
+</html>
