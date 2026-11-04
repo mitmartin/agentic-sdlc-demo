@@ -101,6 +101,8 @@ a nonempty "blocked" response is not a successful release-notes draft.
 
 Use the prepared successful run if live execution is slow. Human review remains
 necessary before anyone publishes the notes.
+The [verified prepared run](https://github.com/mitmartin/agentic-sdlc-demo/actions/runs/41747306663)
+contains an inspected `release-notes-draft` artifact.
 
 ## Credential checkpoint
 
