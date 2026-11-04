@@ -58,6 +58,9 @@ Do not merge the prepared PR before it is needed.
 
 ## 3. Review, iterate, and merge (9-14 minutes)
 
+The prepared artifact is [PR #3](https://github.com/mitmartin/agentic-sdlc-demo/pull/3).
+It remains unmerged; its CI requires a human to approve the workflow run.
+
 On the prepared PR, mark it ready when appropriate and request **Copilot**
 through the Reviewers control. Inspect the diff, code review, and CI together.
 
@@ -86,13 +89,15 @@ gh workflow run release-notes.yml -R mitmartin/agentic-sdlc-demo --ref main
 ```
 
 Show the workflow's permission boundary and actual command:
-`copilot -p ... --silent --no-ask-user`. Only the shell tool is exposed and only
+`copilot -p ... --silent --no-ask-user`. Only the Bash tool is exposed and only
 `git log` is preapproved; built-in MCP servers are disabled. The repository token
 is read-only and checkout credentials are not persisted.
 
 The job reads the latest ten commits on `main`, creates AI-drafted release notes,
 adds them to the run summary, and uploads `release-notes-draft`. Open the summary
 or download the artifact. It does not create a release, tag, PR, or commit.
+The output must reference real commits from that history before it is accepted;
+a nonempty "blocked" response is not a successful release-notes draft.
 
 Use the prepared successful run if live execution is slow. Human review remains
 necessary before anyone publishes the notes.
