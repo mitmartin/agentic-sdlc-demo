@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       mode:
-        description: 'Draft the intake, verify the App, or create a private workspace'
+        description: 'Draft, verify the App, create a workspace, or recover an empty workspace'
         required: true
         type: choice
         default: draft
@@ -16,6 +16,11 @@ on:
           - draft
           - verify-app
           - create
+          - recover-empty
+      repository_id:
+        description: 'Exact GitHub repository ID, required only for empty-workspace recovery'
+        required: false
+        type: string
 
 concurrency:
   group: hve-intake-${{ inputs.issue_number }}
@@ -143,3 +148,59 @@ jobs:
               exit 1
             }
           echo "Created private workspace: https://github.com/mitmartin/$name" >> "$GITHUB_STEP_SUMMARY"
+
+  recover-empty:
+    if: inputs.mode == 'recover-empty' && github.repository == 'mitmartin/agentic-sdlc-demo'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Validate the requested identity
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          REPOSITORY_ID: ${{ inputs.repository_id }}
+        run: |
+          [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Invalid issue number."; exit 1; }
+          [[ "$REPOSITORY_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::An exact repository ID is required."; exit 1; }
+      - name: Mint a template read token
+        id: source
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.HVE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HVE_APP_PRIVATE_KEY }}
+          owner: mitmartin
+          repositories: hve-intake-template
+          permission-contents: read
+      - name: Mint a destination write token
+        id: target
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.HVE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HVE_APP_PRIVATE_KEY }}
+          owner: mitmartin
+          repositories: hve-intake-${{ inputs.issue_number }}
+          permission-contents: write
+      - name: Populate only the verified empty repository
+        env:
+          SOURCE_TOKEN: ${{ steps.source.outputs.token }}
+          TARGET_TOKEN: ${{ steps.target.outputs.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          REPOSITORY_ID: ${{ inputs.repository_id }}
+        run: |
+          repo="mitmartin/hve-intake-$ISSUE_NUMBER"
+          GH_TOKEN="$TARGET_TOKEN" gh api "repos/$repo" |
+            jq -e --arg repo "$repo" --argjson id "$REPOSITORY_ID" \
+              '.full_name == $repo and .id == $id and .private == true and .default_branch == "main"' > /dev/null
+          GH_TOKEN="$TARGET_TOKEN" gh api "repos/$repo/branches" |
+            jq -e 'length == 0' > /dev/null
+          printf '#!/bin/sh\nprintf "%%s\\n" "$GIT_TOKEN"\n' > "$RUNNER_TEMP/askpass"
+          chmod 700 "$RUNNER_TEMP/askpass"
+          export GIT_ASKPASS="$RUNNER_TEMP/askpass" GIT_TERMINAL_PROMPT=0
+          GIT_TOKEN="$SOURCE_TOKEN" git clone --quiet --no-checkout --no-tags \
+            https://x-access-token@github.com/mitmartin/hve-intake-template.git "$RUNNER_TEMP/template"
+          template_commit=39a9d2bd68bcb401ad1bceda8f036b17e8c08720
+          test "$(git -C "$RUNNER_TEMP/template" rev-parse HEAD)" = "$template_commit"
+          GIT_TOKEN="$TARGET_TOKEN" git -C "$RUNNER_TEMP/template" push --quiet \
+            --force-with-lease=refs/heads/main: \
+            "https://x-access-token@github.com/$repo.git" "$template_commit:refs/heads/main"
+          echo "Recovered private workspace from the approved blank template: https://github.com/$repo" >> "$GITHUB_STEP_SUMMARY"
