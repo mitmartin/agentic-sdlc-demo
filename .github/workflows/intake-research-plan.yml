@@ -1,0 +1,59 @@
+name: Research and plan an intake
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Number of the fictional business-intake issue'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Fetch and validate the intake
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Issue number must be a positive integer."; exit 1; }
+          gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER" > "$RUNNER_TEMP/issue.json"
+          node scripts/demo/prepare-intake.mjs "$RUNNER_TEMP/issue.json" "$RUNNER_TEMP/intake-prompt.txt"
+      - name: Install pinned Copilot CLI
+        run: npm install --global @github/copilot@1.0.105
+      - name: Research and plan
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          test -n "$COPILOT_GITHUB_TOKEN" || { echo "::error::Set the COPILOT_GITHUB_TOKEN secret."; exit 1; }
+          copilot -p "$(cat "$RUNNER_TEMP/intake-prompt.txt")" \
+            --silent --no-ask-user --disable-builtin-mcps \
+            --available-tools view --allow-tool view \
+            > "$RUNNER_TEMP/intake-draft.md"
+          for heading in 'Draft BRD' 'Research' 'Plan' 'Review and handoff'; do
+            grep -q "^## $heading" "$RUNNER_TEMP/intake-draft.md" || { echo "::error::Draft is missing $heading."; exit 1; }
+          done
+          {
+            echo '## Intake draft: human review required'
+            echo 'Generated from a fictional issue. This is a draft, not an approved requirement or a deployed solution.'
+            cat "$RUNNER_TEMP/intake-draft.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: intake-research-plan
+          path: ${{ runner.temp }}/intake-draft.md
+          if-no-files-found: error
+          retention-days: 7

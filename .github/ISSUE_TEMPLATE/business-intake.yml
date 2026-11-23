@@ -1,0 +1,37 @@
+name: Business intake
+description: Capture a fictional business request for research and planning.
+title: 'Intake: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a public demonstration repository. Use fictional information only.
+        Do not include customer information, employee names, confidential material, or credentials.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Business problem and users
+      description: Who experiences the problem, and what happens today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome and evidence
+      description: Describe the outcome and how a person could verify it.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Process, systems and constraints
+      description: Describe the current process, known systems and boundaries. Mark unknowns.
+    validations:
+      required: true
+  - type: textarea
+    id: review
+    attributes:
+      label: Human review and open questions
+      description: Where should a person decide or approve? What remains unknown?
+    validations:
+      required: true
