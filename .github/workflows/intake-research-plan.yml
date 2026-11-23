@@ -8,31 +8,36 @@ on:
         required: true
         type: string
       mode:
-        description: 'Draft the intake or verify the provisioning App'
+        description: 'Draft the intake, verify the App, or create a private workspace'
         required: true
         type: choice
         default: draft
         options:
           - draft
           - verify-app
+          - create
+
+concurrency:
+  group: hve-intake-${{ inputs.issue_number }}
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   draft:
     if: inputs.mode == 'draft'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     permissions:
       contents: read
       issues: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version-file: .node-version
       - name: Fetch and validate the intake
         env:
           GH_TOKEN: ${{ github.token }}
@@ -61,7 +66,7 @@ jobs:
             echo 'Generated from a fictional issue. This is a draft, not an approved requirement or a deployed solution.'
             cat "$RUNNER_TEMP/intake-draft.md"
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: intake-research-plan
           path: ${{ runner.temp }}/intake-draft.md
@@ -90,3 +95,51 @@ jobs:
         run: |
           gh api repos/mitmartin/hve-intake-template \
             --jq 'if .private and .is_template and .owner.login == "mitmartin" then "Private template accessible." else error("Unexpected template configuration.") end'
+
+  create:
+    if: inputs.mode == 'create' && github.repository == 'mitmartin/agentic-sdlc-demo'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: read # validate the manually selected intake
+    steps:
+      - name: Validate the selected issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Issue number must be a positive integer."; exit 1; }
+          gh api "repos/$REPOSITORY/issues/$ISSUE_NUMBER" > "$RUNNER_TEMP/issue.json"
+          jq -e --argjson number "$ISSUE_NUMBER" \
+            '.number == $number and .pull_request == null and (.title | type == "string") and (.body | type == "string" and length > 0 and length <= 20000)' \
+            "$RUNNER_TEMP/issue.json" > /dev/null
+      - name: Mint a template-scoped App token
+        id: app
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.HVE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HVE_APP_PRIVATE_KEY }}
+          owner: mitmartin
+          repositories: hve-intake-template
+          permission-administration: write
+          permission-contents: read
+      - name: Create the private workspace
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          name="hve-intake-$ISSUE_NUMBER"
+          if ! gh api --method POST repos/mitmartin/hve-intake-template/generate \
+            -f owner=mitmartin -f "name=$name" -F private=true -F include_all_branches=false \
+            > "$RUNNER_TEMP/generated-repo.json"; then
+            echo "::error::Creation failed. Check whether the repo was created before trying again."
+            exit 1
+          fi
+          jq -e --arg name "mitmartin/$name" \
+            '.full_name == $name and .private == true and .owner.login == "mitmartin"' \
+            "$RUNNER_TEMP/generated-repo.json" > /dev/null || {
+              echo "::error::Created repository did not match the requested owner and visibility."
+              exit 1
+            }
+          echo "Created private workspace: https://github.com/mitmartin/$name" >> "$GITHUB_STEP_SUMMARY"
