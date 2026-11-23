@@ -85,6 +85,15 @@ jobs:
     timeout-minutes: 5
     permissions: {}
     steps:
+      - name: Mint a read-only installation inventory token
+        id: inventory
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.HVE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HVE_APP_PRIVATE_KEY }}
+          owner: mitmartin
+          permission-administration: read
+          permission-contents: read
       - name: Mint a template-scoped App token
         id: app
         uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
@@ -131,24 +140,100 @@ jobs:
           permission-administration: write
           permission-contents: read
       - name: Create the private workspace
+        id: create
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
+          INVENTORY_TOKEN: ${{ steps.inventory.outputs.token }}
           ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
+          set -euo pipefail
           name="hve-intake-$ISSUE_NUMBER"
-          if ! gh api --method POST repos/mitmartin/hve-intake-template/generate \
-            -f owner=mitmartin -f "name=$name" -F private=true -F include_all_branches=false \
-            > "$RUNNER_TEMP/generated-repo.json"; then
-            echo "::error::Creation failed. Check whether the repo was created before trying again."
+          repo="mitmartin/$name"
+          if GH_TOKEN="$INVENTORY_TOKEN" gh api "repos/$repo" \
+            > /dev/null 2> "$RUNNER_TEMP/repo-check.err"; then
+            echo "::error::The destination repository already exists; refusing to reuse it."
+            exit 1
+          elif ! grep -Fq '(HTTP 404)' "$RUNNER_TEMP/repo-check.err"; then
+            cat "$RUNNER_TEMP/repo-check.err" >&2
+            echo "::error::Could not establish that the destination repository is unused."
             exit 1
           fi
-          jq -e --arg name "mitmartin/$name" \
-            '.full_name == $name and .private == true and .owner.login == "mitmartin"' \
-            "$RUNNER_TEMP/generated-repo.json" > /dev/null || {
-              echo "::error::Created repository did not match the requested owner and visibility."
+
+          if gh api --method POST repos/mitmartin/hve-intake-template/generate \
+            -f owner=mitmartin -f "name=$name" -F private=true -F include_all_branches=false \
+            > "$RUNNER_TEMP/generated-repo.json" 2> "$RUNNER_TEMP/generate.err"; then
+            jq -e --arg name "$repo" \
+              '.full_name == $name and .private == true and .owner.login == "mitmartin"' \
+              "$RUNNER_TEMP/generated-repo.json" > /dev/null || {
+                echo "::error::Created repository did not match the requested owner and visibility."
+                exit 1
+              }
+            echo "Created private workspace: https://github.com/$repo" >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat "$RUNNER_TEMP/generate.err" >&2
+            if ! grep -Fq '(HTTP 422)' "$RUNNER_TEMP/generate.err"; then
+              echo "::error::Template generation failed for a reason other than the known empty-repository case."
               exit 1
-            }
-          echo "Created private workspace: https://github.com/mitmartin/$name" >> "$GITHUB_STEP_SUMMARY"
+            fi
+
+            if ! GH_TOKEN="$INVENTORY_TOKEN" gh api "repos/$repo" \
+              > "$RUNNER_TEMP/generated-repo.json"; then
+              echo "::error::Template generation returned HTTP 422, but the destination is not accessible."
+              exit 1
+            fi
+            jq -e --arg name "$repo" \
+              '.full_name == $name and .private == true and .owner.login == "mitmartin" and .default_branch == "main"' \
+              "$RUNNER_TEMP/generated-repo.json" > /dev/null || {
+                echo "::error::The HTTP 422 destination did not match the expected private repository."
+                exit 1
+              }
+            if ! GH_TOKEN="$INVENTORY_TOKEN" gh api "repos/$repo/branches" \
+              | jq -e 'length == 0' > /dev/null; then
+              echo "::error::The HTTP 422 destination is not empty; refusing to overwrite it."
+              exit 1
+            fi
+
+            repository_id="$(jq -r '.id' "$RUNNER_TEMP/generated-repo.json")"
+            echo "recovery_required=true" >> "$GITHUB_OUTPUT"
+            echo "repository_id=$repository_id" >> "$GITHUB_OUTPUT"
+            echo "GitHub created the private repo but could not copy the template. Verified repository ID $repository_id is empty; initializing it from the pinned template." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Mint a destination-scoped recovery token
+        if: steps.create.outputs.recovery_required == 'true'
+        id: recovery
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.HVE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HVE_APP_PRIVATE_KEY }}
+          owner: mitmartin
+          repositories: hve-intake-${{ inputs.issue_number }}
+          permission-contents: write
+      - name: Initialize the verified empty repository
+        if: steps.create.outputs.recovery_required == 'true'
+        env:
+          SOURCE_TOKEN: ${{ steps.app.outputs.token }}
+          TARGET_TOKEN: ${{ steps.recovery.outputs.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          REPOSITORY_ID: ${{ steps.create.outputs.repository_id }}
+        run: |
+          set -euo pipefail
+          repo="mitmartin/hve-intake-$ISSUE_NUMBER"
+          GH_TOKEN="$TARGET_TOKEN" gh api "repos/$repo" |
+            jq -e --arg repo "$repo" --argjson id "$REPOSITORY_ID" \
+              '.full_name == $repo and .id == $id and .private == true and .default_branch == "main"' > /dev/null
+          GH_TOKEN="$TARGET_TOKEN" gh api "repos/$repo/branches" |
+            jq -e 'length == 0' > /dev/null
+          printf '#!/bin/sh\nprintf "%%s\\n" "$GIT_TOKEN"\n' > "$RUNNER_TEMP/askpass"
+          chmod 700 "$RUNNER_TEMP/askpass"
+          export GIT_ASKPASS="$RUNNER_TEMP/askpass" GIT_TERMINAL_PROMPT=0
+          GIT_TOKEN="$SOURCE_TOKEN" git clone --quiet --no-checkout --no-tags \
+            https://x-access-token@github.com/mitmartin/hve-intake-template.git "$RUNNER_TEMP/template"
+          template_commit=39a9d2bd68bcb401ad1bceda8f036b17e8c08720
+          test "$(git -C "$RUNNER_TEMP/template" rev-parse HEAD)" = "$template_commit"
+          GIT_TOKEN="$TARGET_TOKEN" git -C "$RUNNER_TEMP/template" push --quiet \
+            --force-with-lease=refs/heads/main: \
+            "https://x-access-token@github.com/$repo.git" "$template_commit:refs/heads/main"
+          echo "Initialized the private workspace from the approved blank template: https://github.com/$repo" >> "$GITHUB_STEP_SUMMARY"
 
   recover-empty:
     if: inputs.mode == 'recover-empty' && github.repository == 'mitmartin/agentic-sdlc-demo'

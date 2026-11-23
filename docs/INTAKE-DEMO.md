@@ -42,20 +42,18 @@ code, implement the plan, deploy, invoke Work IQ, or merge a PR.
    destination is `mitmartin/hve-intake-<issue-number>`; an existing name is
    never reused automatically. The `mitmartin/hve-intake-template` template
    and destination are private.
-3. With the App installed on **selected repositories**, GitHub may create an
-   empty private repo and return HTTP 422 when the App cannot access the new
-   repo to copy the template. Do not blindly retry `create`. Check the owner,
-   privacy, repository ID, and contents. Add the new repo to the App's selected
-   installation. If it is empty, manually run `recover-empty` using the issue
-   number and exact repository ID. Recovery checks identity, privacy, and an
-   empty branch set, then atomically initializes `main` from the pinned blank
-   template; it refuses to overwrite an existing `main`.
-4. Once the App has access to the private repo, manually run `rpi` with the
-   issue number and exact repository ID. The workflow launches the real HVE
-   RPI Agent, which invokes Research and Plan when its gates permit, and stops
-   before implementation. A separate CLI pass drafts the BRD from the intake
-   and any available HVE evidence. A separate privileged job opens a draft PR
-   containing the BRD and generated evidence. Check
+3. If template generation returns HTTP 422 after creating the destination, the
+   workflow checks that the repository belongs to the expected owner, is
+   private, uses `main`, and has no branches. It then mints a write token
+   scoped to that exact repository and initializes it from the pinned blank
+   template. It stops rather than reusing a pre-existing repository or
+   overwriting any branch. The separate `recover-empty` mode remains available
+   for manually recovering an already-created empty repo.
+4. Manually run `rpi` with the issue number and exact repository ID. The
+   workflow launches the real HVE RPI Agent, which invokes Research and Plan
+   when its gates permit, and stops before implementation. A separate CLI pass
+   drafts the BRD from the intake and any available HVE evidence. A separate
+   privileged job opens a draft PR containing the BRD and generated evidence. Check
    `docs/hve-run-status.md` and the HVE session state: skill invocation does
    not mean that planning completed or that anything was approved.
 5. Review the draft, resolve blockers and assumptions, and decide whether to
@@ -64,19 +62,22 @@ code, implement the plan, deploy, invoke Work IQ, or merge a PR.
 
 ### Setup and security
 
-Install a dedicated GitHub App on **selected repositories**: initially the
-private template, then each new destination as approved. The App needs
-Administration, Contents, and Pull requests read/write permissions. Store its
-client ID in `HVE_APP_CLIENT_ID` and private key in `HVE_APP_PRIVATE_KEY` on
-this controller repository. The CLI also needs `COPILOT_GITHUB_TOKEN`.
+Install a dedicated GitHub App with **All repositories** access so its
+read-only inventory token can verify the newly created destination. The
+workflow still scopes template reads and destination writes to the specific
+repositories needed for each step. The App needs Administration, Contents,
+and Pull requests read/write permissions. Store its client ID in
+`HVE_APP_CLIENT_ID` and private key in `HVE_APP_PRIVATE_KEY` on this controller
+repository. The CLI also needs `COPILOT_GITHUB_TOKEN`.
 
 The model job receives no App private key or App token and cannot run shell
 commands. The separate publisher validates the exact private repository ID and
 restricts files to draft documentation and HVE tracking artifacts. Drafts are
 encrypted for transfer between jobs; the public controller's Actions artifact
 contains ciphertext, not the model transcript or plaintext draft. Treat all
-intake and model output as untrusted. App permissions remain powerful, even
-when scoped to selected repositories.
+intake and model output as untrusted. All-repository installation access is
+broad; workflow tokens request only the permissions and repository scope
+needed for each operation.
 
 Creation, App access, HVE gate completion, and the draft PR must each be
 verified for the particular run. A successful CLI exit or skill invocation is
