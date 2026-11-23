@@ -85,15 +85,6 @@ jobs:
     timeout-minutes: 5
     permissions: {}
     steps:
-      - name: Mint a read-only installation inventory token
-        id: inventory
-        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
-        with:
-          client-id: ${{ vars.HVE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.HVE_APP_PRIVATE_KEY }}
-          owner: mitmartin
-          permission-administration: read
-          permission-contents: read
       - name: Mint a template-scoped App token
         id: app
         uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
@@ -129,6 +120,15 @@ jobs:
           jq -e --argjson number "$ISSUE_NUMBER" \
             '.number == $number and .pull_request == null and (.title | type == "string") and (.body | type == "string" and length > 0 and length <= 20000)' \
             "$RUNNER_TEMP/issue.json" > /dev/null
+      - name: Mint a read-only installation inventory token
+        id: inventory
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.HVE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HVE_APP_PRIVATE_KEY }}
+          owner: mitmartin
+          permission-administration: read
+          permission-contents: read
       - name: Mint a template-scoped App token
         id: app
         uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
