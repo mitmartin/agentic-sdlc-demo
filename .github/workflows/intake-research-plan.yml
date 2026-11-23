@@ -7,15 +7,25 @@ on:
         description: 'Number of the fictional business-intake issue'
         required: true
         type: string
+      mode:
+        description: 'Draft the intake or verify the provisioning App'
+        required: true
+        type: choice
+        default: draft
+        options:
+          - draft
+          - verify-app
 
-permissions:
-  contents: read
-  issues: read
+permissions: {}
 
 jobs:
   draft:
+    if: inputs.mode == 'draft'
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    permissions:
+      contents: read
+      issues: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -57,3 +67,26 @@ jobs:
           path: ${{ runner.temp }}/intake-draft.md
           if-no-files-found: error
           retention-days: 7
+
+  verify-app:
+    if: inputs.mode == 'verify-app'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Mint a template-scoped App token
+        id: app
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.HVE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HVE_APP_PRIVATE_KEY }}
+          owner: mitmartin
+          repositories: hve-intake-template
+          permission-administration: write
+          permission-contents: read
+      - name: Verify the private template
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          gh api repos/mitmartin/hve-intake-template \
+            --jq 'if .private and .is_template and .owner.login == "mitmartin" then "Private template accessible." else error("Unexpected template configuration.") end'
