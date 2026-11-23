@@ -53,8 +53,9 @@ code, implement the plan, deploy, invoke Work IQ, or merge a PR.
 4. Once the App has access to the private repo, manually run `rpi` with the
    issue number and exact repository ID. The workflow launches the real HVE
    RPI Agent, which invokes Research and Plan when its gates permit, and stops
-   before implementation. A separate privileged job opens a draft PR containing
-   the intake-based BRD and any generated evidence. Check
+   before implementation. A separate CLI pass drafts the BRD from the intake
+   and any available HVE evidence. A separate privileged job opens a draft PR
+   containing the BRD and generated evidence. Check
    `docs/hve-run-status.md` and the HVE session state: skill invocation does
    not mean that planning completed or that anything was approved.
 5. Review the draft, resolve blockers and assumptions, and decide whether to

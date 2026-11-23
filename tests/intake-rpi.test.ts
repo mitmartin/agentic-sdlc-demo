@@ -1,11 +1,16 @@
 import { generateKeyPairSync } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   openBundle,
   publishDraft,
+  prepareWorkspace,
   sealBundle,
   skillEvidence,
   validateFiles,
+  bundleWorkspace,
 } from '../scripts/demo/intake-rpi.mjs';
 
 const files = [
@@ -80,6 +85,63 @@ describe('isolated HVE intake handoff', () => {
     const altered = JSON.parse(envelope);
     altered.tag = Buffer.alloc(16).toString('base64');
     expect(() => openBundle(JSON.stringify(altered), privateKey, 6)).toThrow();
+  });
+
+  it('preserves intake data and reports BRD and skill evidence without claiming completion', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hve-intake-test-'));
+    try {
+      const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+      prepareWorkspace(
+        { number: 6, title: 'New app', body: 'Fictional details' },
+        root,
+      );
+      const trace = join(root, 'trace.jsonl');
+      writeFileSync(
+        trace,
+        [
+          {
+            type: 'tool.execution_start',
+            data: {
+              toolCallId: '1',
+              toolName: 'skill',
+              arguments: { skill: 'rpi-research' },
+            },
+          },
+          {
+            type: 'tool.execution_complete',
+            data: { toolCallId: '1', success: true },
+          },
+        ]
+          .map((event) => JSON.stringify(event))
+          .join('\n'),
+      );
+      const envelope = bundleWorkspace(
+        root,
+        trace,
+        '0',
+        '0',
+        'yes',
+        6,
+        publicKey,
+      );
+      const output = openBundle(envelope, privateKey, 6);
+      expect(
+        output.find((file) => file.path === 'docs/BRD.md')?.content,
+      ).toContain('Fictional details');
+      const status = output.find(
+        (file) => file.path === 'docs/hve-run-status.md',
+      )?.content;
+      expect(status).toContain('Research skill invoked: yes');
+      expect(status).toContain('Plan skill invoked: no');
+      expect(status).toContain('BRD file changed: yes');
+      expect(status).toContain('Invocation is not completion');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('refuses to publish to a different or public repository before any writes', async () => {

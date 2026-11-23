@@ -3,6 +3,12 @@ export interface DraftFile {
   content: string;
 }
 
+/** Writes an unapproved, intake-grounded brief and initial BRD into the workspace. */
+export function prepareWorkspace(
+  issue: { number: number; title: string; body: string; pull_request?: object },
+  workspace: string,
+): string;
+
 /** Records successful skill tool calls, not completion of their work. */
 export function skillEvidence(trace: string): {
   research: boolean;
@@ -21,6 +27,17 @@ export function openBundle(
   privateKey: string,
   issueNumber: number,
 ): DraftFile[];
+
+/** Collects allowed artifacts and encrypts the draft and honest invocation status. */
+export function bundleWorkspace(
+  workspace: string,
+  tracePath: string,
+  exitCode: string,
+  brdExitCode: string,
+  brdChanged: string,
+  issueNumber: number,
+  publicKey: string,
+): string;
 
 /** Publishes validated drafts to a new branch and draft PR in the exact private destination. */
 export function publishDraft(

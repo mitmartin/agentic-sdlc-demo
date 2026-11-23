@@ -181,6 +181,8 @@ export function bundleWorkspace(
   workspace,
   tracePath,
   exitCode,
+  brdExitCode,
+  brdChanged,
   issueNumber,
   publicKey,
 ) {
@@ -192,9 +194,11 @@ export function bundleWorkspace(
 
 CLI exit code: ${exitCode}. Research skill invoked: ${evidence.research ? 'yes' : 'no'}.
 Plan skill invoked: ${evidence.plan ? 'yes' : 'no'}.
+BRD drafting exit code: ${brdExitCode}. BRD file changed: ${brdChanged === 'yes' ? 'yes' : 'no'}.
 
 Invocation is not completion. Read the research, plan, and session state for
-readiness, missing information, and blockers. A person must review all drafts.
+readiness, missing information, and blockers. A changed BRD is not proof of
+quality or approval. A person must review all drafts.
 `,
   );
   return sealBundle({ issueNumber, files: collect(root) }, publicKey);
@@ -272,14 +276,30 @@ async function main() {
   if (mode === 'prepare') {
     prepareWorkspace(JSON.parse(readFileSync(args[0], 'utf8')), args[1]);
   } else if (mode === 'bundle') {
-    const [workspace, trace, exitCode, issueNumber, output] = args;
+    const [
+      workspace,
+      trace,
+      exitCode,
+      brdExitCode,
+      brdChanged,
+      issueNumber,
+      output,
+    ] = args;
     const key = Buffer.from(
       process.env.HVE_PUBLIC_KEY_BASE64,
       'base64',
     ).toString('utf8');
     writeFileSync(
       output,
-      bundleWorkspace(workspace, trace, exitCode, Number(issueNumber), key),
+      bundleWorkspace(
+        workspace,
+        trace,
+        exitCode,
+        brdExitCode,
+        brdChanged,
+        Number(issueNumber),
+        key,
+      ),
     );
   } else if (mode === 'publish') {
     const [input, issueNumber, repositoryId] = args;
