@@ -18,9 +18,10 @@ Keep routes thin and behavior in services. Avoid `any`. Add a focused test for
 each behavior change and update API docs when routes change. Preserve unrelated
 changes. Use Conventional Commits and small PRs.
 
-The overdue "due today" bug is intentional until its issue is assigned. Do not
-silently fix unrelated backlog work. There is no authentication or persistence:
-use fictional data only and do not deploy publicly.
+Overdue means unfinished work with a due date strictly before the current UTC
+calendar date; preserve this behavior. Do not silently fix unrelated backlog
+work. There is no authentication or persistence: use fictional data only and do
+not deploy publicly.
 
 PR descriptions: Summary, Linked issue (`Fixes #N`), How to test, Risk.
 Humans merge. Never add credentials, copy local authentication into Actions,

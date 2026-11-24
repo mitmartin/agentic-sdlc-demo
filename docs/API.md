@@ -15,6 +15,9 @@ Seed dates are generated relative to the current UTC date.
 | PATCH  | `/api/work-orders/:id` | 200     | Update status and/or assignee                                  |
 | GET    | `/api/stats`           | 200     | Counts: `open`, `inProgress`, `blocked`, `overdue`, `critical` |
 
+Overdue counts unfinished work with a due date strictly before the current UTC
+calendar date. Work due today or later, and completed work, is not overdue.
+
 ## Create a work order
 
 ```json
@@ -41,6 +44,5 @@ routes use 404 (`NOT_FOUND`). Unexpected failures use 500 (`INTERNAL_ERROR`).
 
 ## Deliberate baseline limitations
 
-- Due-today unfinished work is incorrectly included in overdue counts.
 - No authentication, persistence or concurrent-update protection is provided.
 - Never expose this demonstration to untrusted users or use real data.

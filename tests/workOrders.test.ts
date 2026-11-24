@@ -83,14 +83,18 @@ describe('work orders', () => {
     expect(data.workOrders[0]).toEqual(original);
   });
 
-  it('counts past unfinished work but excludes future and completed work', () => {
+  it('counts only past unfinished work as overdue', () => {
     const order: WorkOrder = {
       ...createSeedData().workOrders[0]!,
       status: 'open',
       dueDate: '2026-03-15',
     };
     expect(isOverdue(order)).toBe(true);
+    expect(isOverdue({ ...order, dueDate: '2026-03-16' })).toBe(false);
     expect(isOverdue({ ...order, dueDate: '2026-03-17' })).toBe(false);
     expect(isOverdue({ ...order, status: 'done' })).toBe(false);
+    expect(isOverdue({ ...order, status: 'done', dueDate: '2026-03-15' })).toBe(
+      false,
+    );
   });
 });

@@ -13,9 +13,8 @@ machines supports a focused four-part demonstration:
 
 The core demo has no external cloud dependency and contains no customer data.
 
-> **Demo only.** The baseline intentionally includes an overdue-date bug for the
-> issue-to-PR demonstration. It has no authentication or persistence. Do not use
-> it in production or with real data.
+> **Demo only.** The app has no authentication or persistence. Do not use it in
+> production or with real data.
 
 ## Run locally
 
@@ -41,8 +40,8 @@ npm run test:coverage
 npm run build
 ```
 
-Tests cover services and API behavior but deliberately omit the overdue
-"due today" edge case until Copilot tackles the seeded bug issue.
+Tests cover services and API behavior, including the overdue due-today boundary
+with a frozen clock.
 
 ## Package feeds
 
